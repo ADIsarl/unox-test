@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UNOX Voice Pro</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 20px; background: #1a1a1a; color: white; }
+        .card { background: #2d2d2d; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); max-width: 500px; margin: auto; }
+        #micBtn { width: 120px; height: 120px; border-radius: 50%; border: none; background: #007bff; color: white; font-size: 50px; cursor: pointer; transition: 0.3s; margin: 20px 0; }
+        #micBtn.recording { background: #dc3545; box-shadow: 0 0 20px #dc3545; transform: scale(1.1); }
+        .status { font-style: italic; color: #aaa; margin-bottom: 15px; }
+        .preview { text-align: left; background: #3d3d3d; padding: 15px; border-radius: 8px; font-size: 14px; line-height: 1.6; }
+        .highlight { color: #00d1b2; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h2>Saisie Rapide UNOX</h2>
+        <p style="font-size: 0.9em;">Ex: "<b>Devis</b> pour client Martin à Lyon, <b>Cheftop</b> <b>gaz</b> <b>10 niveaux</b> avec <b>lavage</b> et <b>hotte</b>"</p>
+        
+        <button id="micBtn">🎙️</button>
+        <div id="status" class="status">Appuyez pour commencer</div>
+
+        <div class="preview" id="preview">
+            <strong>Analyse en temps réel :</strong><br>
+            Type: <span id="out-type" class="highlight">-</span><br>
+            Client: <span id="out-client" class="highlight">-</span><br>
+            Ville: <span id="out-ville" class="highlight">-</span><br>
+            Gamme: <span id="out-gamme" class="highlight">-</span><br>
+            Énergie: <span id="out-energie" class="highlight">-</span><br>
+            Niveaux: <span id="out-niveaux" class="highlight">-</span><br>
+            Options: <span id="out-options" class="highlight">-</span>
+        </div>
+    </div>
+
+    <script>
+        const webHookUrl = "https://hook.eu2.make.com/dkhjvgph0ma9v39b9vputryap8k2yqh5"; // <--- REMPLACER PAR VOTRE LIEN MAKE
+        const btn = document.getElementById('micBtn');
+        const status = document.getElementById('status');
+
+        // Listes de mots-clés Unox
+        const types = ["DEVIS", "COMMANDE", "FACTURE"];
+        const gammes = ["CHEFTOP", "BAKERTOP", "SPEED", "BAKERLUX", "CHEFLUX", "LINEMISS", "LINEMICRO", "EVEREO"];
+        const energies = ["GAZ", "ELECTRIQUE", "ÉLECTRIQUE"];
+        const optionsList = ["LAVAGE", "SONDE", "HOTTE", "FERRAGE DROITE", "OSMOSEUR"];
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        
+        if (SpeechRecognition) {
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'fr-FR';
+            recognition.interimResults = false;
+
+            btn.onclick = () => {
+                recognition.start();
+                btn.classList.add('recording');
+                status.innerText = "Je vous écoute...";
+            };
+
+            recognition.onresult = (event) => {
+                const phrase = event.results[0][0].transcript.toUpperCase();
+                btn.classList.remove('recording');
+                status.innerText = "Analyse et envoi...";
+
+                // Extraction intelligente
+                const data = {
+                    type: types.find(t => phrase.includes(t)) || "Non spécifié",
+                    client: phrase.match(/CLIENT ([\wÀ-ÿ]+)/)?.[1] || "Inconnu",
+                    ville: phrase.match(/À ([\wÀ-ÿ]+)/)?.[1] || phrase.match(/VILLE ([\wÀ-ÿ]+)/)?.[1] || "Inconnue",
+                    gamme: gammes.find(g => phrase.includes(g)) || "Non détectée",
+                    energie: energies.find(e => phrase.includes(e)) || "Non spécifiée",
+                    niveaux: phrase.match(/(\d+) NIVEAUX/)?.[1] || "N/C",
+                    options: optionsList.filter(o => phrase.includes(o)).join(", ") || "Aucune",
+                    phrase_complete: phrase
+                };
+
+                // Mise à jour visuelle
+                document.getElementById('out-type').innerText = data.type;
+                document.getElementById('out-client').innerText = data.client;
+                document.getElementById('out-ville').innerText = data.ville;
+                document.getElementById('out-gamme').innerText = data.gamme;
+                document.getElementById('out-energie').innerText = data.energie;
+                document.getElementById('out-niveaux').innerText = data.niveaux;
+                document.getElementById('out-options').innerText = data.options;
+
+                // Envoi à Make
+                fetch(webHookUrl, {
+                    method: 'POST',
+                    mode: 'no-cors', // Pour éviter les blocages de sécurité simples en test
+                    body: JSON.stringify(data),
+                    headers: { 'Content-Type': 'application/json' }
+                }).then(() => {
+                    status.innerText = "Transmis avec succès !";
+                    setTimeout(() => { status.innerText = "Appuyez pour recommencer"; }, 3000);
+                }).catch(err => {
+                    status.innerText = "Erreur d'envoi.";
+                    console.error(err);
+                });
+            };
+        } else {
+            status.innerText = "Micro non supporté sur ce navigateur.";
+        }
+    </script>
+</body>
+</html>
