@@ -45,7 +45,9 @@
         const gammes = ["CHEFTOP", "BAKERTOP", "SPEED", "BAKERLUX", "CHEFLUX", "LINEMISS", "LINEMICRO", "EVEREO"];
         const energies = ["GAZ", "ELECTRIQUE", "ÉLECTRIQUE"];
         const optionsList = ["LAVAGE", "SONDE", "HOTTE", "FERRAGE DROITE", "OSMOSEUR"];
-
+        const tensions = ["TRI", "TRIPHASÉ", "MONO", "MONOPHASÉ"];
+        const ferrages = ["DROITE", "GAUCHE"];
+        
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         
         if (SpeechRecognition) {
@@ -65,17 +67,18 @@
                 status.innerText = "Analyse et envoi...";
 
                 // Extraction intelligente
-                const data = {
-                    type: types.find(t => phrase.includes(t)) || "Non spécifié",
-                    client: phrase.match(/CLIENT ([\wÀ-ÿ]+)/)?.[1] || "Inconnu",
-                    ville: phrase.match(/À ([\wÀ-ÿ]+)/)?.[1] || phrase.match(/VILLE ([\wÀ-ÿ]+)/)?.[1] || "Inconnue",
-                    gamme: gammes.find(g => phrase.includes(g)) || "Non détectée",
-                    energie: energies.find(e => phrase.includes(e)) || "Non spécifiée",
-                    niveaux: phrase.match(/(\d+) NIVEAUX/)?.[1] || "N/C",
-                    options: optionsList.filter(o => phrase.includes(o)).join(", ") || "Aucune",
-                    phrase_complete: phrase
-                };
-
+              const data = {
+    type: types.find(t => phrase.includes(t)) || "Non spécifié",
+    client: phrase.match(/CLIENT ([\wÀ-ÿ]+)/)?.[1] || "Inconnu",
+    ville: phrase.match(/À ([\wÀ-ÿ]+)/)?.[1] || phrase.match(/VILLE ([\wÀ-ÿ]+)/)?.[1] || "Inconnue",
+    gamme: gammes.find(g => phrase.includes(g)) || "Non détectée",
+    energie: energies.find(e => phrase.includes(e)) || "Non spécifiée",
+    tension: tensions.find(t => phrase.includes(t)) || "N/C", // <--- NOUVEAU
+    ferrage: ferrages.find(f => phrase.includes(f)) || "Standard", // <--- NOUVEAU
+    niveaux: phrase.match(/(\d+) NIVEAUX/)?.[1] || "N/C",
+    options: optionsList.filter(o => phrase.includes(o)).join(", ") || "Aucune",
+    phrase_complete: phrase
+};
                 // Mise à jour visuelle
                 document.getElementById('out-type').innerText = data.type;
                 document.getElementById('out-client').innerText = data.client;
@@ -85,19 +88,24 @@
                 document.getElementById('out-niveaux').innerText = data.niveaux;
                 document.getElementById('out-options').innerText = data.options;
 
-                // Envoi à Make
-                fetch(webHookUrl, {
-                    method: 'POST',
-                    mode: 'no-cors', // Pour éviter les blocages de sécurité simples en test
-                    body: JSON.stringify(data),
-                    headers: { 'Content-Type': 'application/json' }
-                }).then(() => {
-                    status.innerText = "Transmis avec succès !";
-                    setTimeout(() => { status.innerText = "Appuyez pour recommencer"; }, 3000);
-                }).catch(err => {
-                    status.innerText = "Erreur d'envoi.";
-                    console.error(err);
-                });
+               // Envoi à Make
+fetch(webHookUrl, {
+    method: 'POST',
+    // On retire 'no-cors' pour permettre à Make de lire le header
+    body: JSON.stringify(data),
+    headers: { 
+        'Content-Type': 'application/json' 
+    }
+}).then(response => {
+    if (response.ok) {
+        status.innerText = "Transmis avec succès !";
+    } else {
+        status.innerText = "Erreur serveur Make.";
+    }
+}).catch(err => {
+    status.innerText = "Erreur de connexion.";
+    console.error(err);
+});
             };
         } else {
             status.innerText = "Micro non supporté sur ce navigateur.";
