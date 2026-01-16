@@ -9,11 +9,8 @@
         .card { background: #1e1e1e; padding: 20px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); max-width: 450px; margin: auto; border: 1px solid #333; }
         #micBtn { width: 90px; height: 90px; border-radius: 50%; border: none; background: #007bff; color: white; font-size: 35px; cursor: pointer; transition: 0.3s; margin: 20px 0; }
         .recording { background: #ff4757 !important; transform: scale(1.1); box-shadow: 0 0 20px #ff4757; }
-        
-        /* Aide et Explications */
         #helpBtn { background: none; border: 1px solid #555; color: #aaa; padding: 5px 15px; border-radius: 20px; cursor: pointer; font-size: 13px; margin-bottom: 10px; }
         #helpContent { display: none; background: #252525; padding: 15px; border-radius: 10px; text-align: left; font-size: 13px; margin-top: 10px; color: #ddd; line-height: 1.5; }
-        
         #confirmBox { display: none; margin-top: 20px; background: #2d2d2d; padding: 15px; border-radius: 12px; border: 1px dashed #555; }
         .btn-send { background: #2ed573; color: white; padding: 12px 25px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 10px; }
         .preview { text-align: left; font-size: 14px; margin-bottom: 10px; }
@@ -24,26 +21,18 @@
 <body>
 
     <div class="card">
-        <button id="helpBtn">❓ Comment utiliser ?</button>
+        <button id="helpBtn">❓ Aide : Mots-clés</button>
         <div id="helpContent">
-            <strong>Exemple à dire :</strong><br>
-            "Fais-moi un <b>Devis</b> pour <b>Client</b> Martin à <b>Ville</b> Lyon, four <b>Cheftop</b> <b>gaz</b> <b>10 niveaux</b> en <b>Tri</b> avec <b>ferrage à droite</b> et option <b>lavage</b>."
-            <br><br>
-            <strong>Mots-clés reconnus :</strong><br>
-            • Type : Devis, Commande, Facture<br>
-            • Gamme : Cheftop, Bakertop, Speed, etc.<br>
-            • Énergie : Gaz, Électrique<br>
-            • Tension : Mono, Tri<br>
-            • Ferrage : Gauche, Droite
+            <strong>Exemple :</strong> "Devis pour client Martin à Lyon, four Cheftop 10 niveaux gaz avec hotte."
         </div>
 
         <h2>Assistant UNOX</h2>
         <button id="micBtn">🎙️</button>
-        <div id="status" class="status">Appuyez pour dicter votre demande</div>
+        <div id="status" class="status">Appuyez pour parler</div>
 
         <div id="confirmBox">
             <div class="preview" id="previewText"></div>
-            <button class="btn-send" id="sendBtn">ENVOYER À MAKE ✅</button>
+            <button class="btn-send" id="sendBtn">ENVOYER ✅</button>
         </div>
     </div>
 
@@ -51,7 +40,6 @@
         const webHookUrl = "https://hook.eu2.make.com/dkhjvgph0ma9v39b9vputryap8k2yqh5"; 
         let currentData = null;
 
-        // --- LISTES DE RÉFÉRENCE ---
         const types = ["DEVIS", "COMMANDE", "FACTURE"];
         const gammes = ["CHEFTOP", "BAKERTOP", "SPEED", "BAKERLUX", "CHEFLUX", "LINEMISS", "LINEMICRO", "EVEREO"];
         const energies = ["GAZ", "ELECTRIQUE", "ÉLECTRIQUE"];
@@ -62,7 +50,6 @@
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         const synth = window.speechSynthesis;
 
-        // Toggle Aide
         document.getElementById('helpBtn').onclick = () => {
             const content = document.getElementById('helpContent');
             content.style.display = content.style.display === 'block' ? 'none' : 'block';
@@ -75,7 +62,7 @@
             document.getElementById('micBtn').onclick = () => {
                 recognition.start();
                 document.getElementById('micBtn').classList.add('recording');
-                document.getElementById('status').innerText = "Je vous écoute...";
+                document.getElementById('status').innerText = "Écoute...";
                 document.getElementById('confirmBox').style.display = 'none';
             };
 
@@ -83,28 +70,26 @@
                 const phrase = event.results[0][0].transcript.toUpperCase();
                 document.getElementById('micBtn').classList.remove('recording');
                 
-                // Analyse intelligente
                 currentData = {
-                    type: types.find(t => phrase.includes(t)) || "DOCUMENT",
-                    client: phrase.match(/CLIENT ([\wÀ-ÿ]+)/)?.[1] || "INCONNU",
-                    ville: phrase.match(/VILLE ([\wÀ-ÿ]+)/)?.[1] || phrase.match(/À ([\wÀ-ÿ]+)/)?.[1] || "INCONNUE",
-                    gamme: gammes.find(g => phrase.includes(g)) || "FOUR",
+                    type: types.find(t => phrase.includes(t)) || "DEVIS",
+                    client: (phrase.match(/CLIENT ([\wÀ-ÿ]+)/) || [])[1] || "INCONNU",
+                    ville: (phrase.match(/VILLE ([\wÀ-ÿ]+)/) || phrase.match(/À ([\wÀ-ÿ]+)/) || [])[1] || "INCONNUE",
+                    gamme: gammes.find(g => phrase.includes(g)) || "NON DÉTECTÉE",
                     energie: energies.find(e => phrase.includes(e)) || "ÉLECTRIQUE",
-                    tension: tensions.find(t => phrase.includes(t)) || "N/C",
+                    tension: tensions.find(t => phrase.includes(t)) || "TRI",
                     ferrage: ferrages.find(f => phrase.includes(f)) || "GAUCHE",
-                    niveaux: phrase.match(/(\d+) NIVEAUX/)?.[1] || "N/C",
+                    niveaux: (phrase.match(/(\d+) NIVEAUX/) || [])[1] || "N/C",
                     options: optionsList.filter(o => phrase.includes(o)).join(", ") || "aucune",
+                    phrase_complete: phrase
                 };
 
-                // Synthèse Vocale de validation
-                const synthesePhrase = `Vous souhaitez un ${currentData.type} pour le client ${currentData.client} à ${currentData.ville}. Un four ${currentData.gamme} ${currentData.niveaux} niveaux, ${currentData.energie} ${currentData.tension}, ferrage ${currentData.ferrage}. Est-ce correct ?`;
+                const synthesePhrase = `C'est un ${currentData.type} pour ${currentData.client}. Un ${currentData.gamme} ${currentData.niveaux} niveaux. Est-ce correct ?`;
                 
                 document.getElementById('previewText').innerHTML = `
                     <strong>Vérification :</strong><br>
                     📄 Type : <span class="highlight">${currentData.type}</span><br>
-                    👤 Client : <span class="highlight">${currentData.client}</span> (${currentData.ville})<br>
-                    🔥 Modèle : <span class="highlight">${currentData.gamme} - ${currentData.niveaux} niv.</span><br>
-                    ⚡ Config : <span class="highlight">${currentData.energie} / ${currentData.tension} / Porte ${currentData.ferrage}</span><br>
+                    👤 Client : <span class="highlight">${currentData.client}</span><br>
+                    🔥 Modèle : <span class="highlight">${currentData.gamme} ${currentData.niveaux} niv.</span><br>
                     🛠️ Options : <span class="highlight">${currentData.options}</span>
                 `;
                 document.getElementById('confirmBox').style.display = 'block';
@@ -116,15 +101,21 @@
             };
 
             document.getElementById('sendBtn').onclick = () => {
+                document.getElementById('status').innerText = "Envoi en cours...";
+                
                 fetch(webHookUrl, {
                     method: 'POST',
-                    body: JSON.stringify(currentData),
-                    headers: { 'Content-Type': 'application/json' }
-                }).then(() => {
-                    alert("JSON envoyé avec succès !");
-                    document.getElementById('confirmBox').style.display = 'none';
-                    document.getElementById('status').innerText = "Transmis.";
-                }).catch(err => alert("Erreur d'envoi. Vérifiez l'URL du Webhook."));
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(currentData)
+                })
+                .then(response => {
+                    if (response.ok) {
+                        alert("Données transmises !");
+                        document.getElementById('confirmBox').style.display = 'none';
+                        document.getElementById('status').innerText = "Prêt.";
+                    }
+                })
+                .catch(err => alert("Erreur : " + err));
             };
         }
     </script>
