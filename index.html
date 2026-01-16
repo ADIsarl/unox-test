@@ -3,112 +3,106 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UNOX Voice Pro</title>
+    <title>UNOX Voice Assistant</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 20px; background: #1a1a1a; color: white; }
-        .card { background: #2d2d2d; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); max-width: 500px; margin: auto; }
-        #micBtn { width: 120px; height: 120px; border-radius: 50%; border: none; background: #007bff; color: white; font-size: 50px; cursor: pointer; transition: 0.3s; margin: 20px 0; }
-        #micBtn.recording { background: #dc3545; box-shadow: 0 0 20px #dc3545; transform: scale(1.1); }
-        .status { font-style: italic; color: #aaa; margin-bottom: 15px; }
-        .preview { text-align: left; background: #3d3d3d; padding: 15px; border-radius: 8px; font-size: 14px; line-height: 1.6; }
+        body { font-family: 'Segoe UI', sans-serif; text-align: center; padding: 20px; background: #1a1a1a; color: white; }
+        .card { background: #2d2d2d; padding: 20px; border-radius: 15px; max-width: 500px; margin: auto; }
+        #micBtn { width: 100px; height: 100px; border-radius: 50%; border: none; background: #007bff; color: white; font-size: 40px; cursor: pointer; }
+        .recording { background: #dc3545 !important; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(220, 53, 69, 0); } 100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); } }
+        #confirmBox { display: none; margin-top: 20px; border-top: 1px solid #444; padding-top: 20px; }
+        .btn-send { background: #28a745; color: white; padding: 15px 30px; border: none; border-radius: 8px; font-size: 18px; cursor: pointer; }
+        .preview { text-align: left; background: #3d3d3d; padding: 15px; border-radius: 8px; margin: 15px 0; font-size: 14px; }
         .highlight { color: #00d1b2; font-weight: bold; }
     </style>
 </head>
 <body>
 
     <div class="card">
-        <h2>Saisie Rapide UNOX</h2>
-        <p style="font-size: 0.9em;">Ex: "<b>Devis</b> pour client Martin à Lyon, <b>Cheftop</b> <b>gaz</b> <b>10 niveaux</b> avec <b>lavage</b> et <b>hotte</b>"</p>
-        
+        <h2>Assistant UNOX</h2>
         <button id="micBtn">🎙️</button>
-        <div id="status" class="status">Appuyez pour commencer</div>
+        <div id="status" style="margin: 15px 0; font-style: italic; color: #aaa;">Appuyez pour dicter</div>
 
-        <div class="preview" id="preview">
-            <strong>Analyse en temps réel :</strong><br>
-            Type: <span id="out-type" class="highlight">-</span><br>
-            Client: <span id="out-client" class="highlight">-</span><br>
-            Ville: <span id="out-ville" class="highlight">-</span><br>
-            Gamme: <span id="out-gamme" class="highlight">-</span><br>
-            Énergie: <span id="out-energie" class="highlight">-</span><br>
-            Niveaux: <span id="out-niveaux" class="highlight">-</span><br>
-            Options: <span id="out-options" class="highlight">-</span>
+        <div id="confirmBox">
+            <div class="preview" id="previewText"></div>
+            <button class="btn-send" id="sendBtn">✅ CONFIRMER ET ENVOYER</button>
+            <p style="font-size: 12px; color: #888; margin-top: 10px;">Ou ré-appuyez sur le micro pour recommencer</p>
         </div>
     </div>
 
     <script>
-        const webHookUrl = "https://hook.eu2.make.com/dkhjvgph0ma9v39b9vputryap8k2yqh5"; // <--- REMPLACER PAR VOTRE LIEN MAKE
-        const btn = document.getElementById('micBtn');
-        const status = document.getElementById('status');
+        const webHookUrl = "VOTRE_URL_MAKE_ICI"; 
+        let currentData = null;
 
-        // Listes de mots-clés Unox
         const types = ["DEVIS", "COMMANDE", "FACTURE"];
         const gammes = ["CHEFTOP", "BAKERTOP", "SPEED", "BAKERLUX", "CHEFLUX", "LINEMISS", "LINEMICRO", "EVEREO"];
         const energies = ["GAZ", "ELECTRIQUE", "ÉLECTRIQUE"];
-        const optionsList = ["LAVAGE", "SONDE", "HOTTE", "FERRAGE DROITE", "OSMOSEUR"];
         const tensions = ["TRI", "TRIPHASÉ", "MONO", "MONOPHASÉ"];
         const ferrages = ["DROITE", "GAUCHE"];
-        
+        const optionsList = ["LAVAGE", "SONDE", "HOTTE", "OSMOSEUR"];
+
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        
+        const synth = window.speechSynthesis;
+
         if (SpeechRecognition) {
             const recognition = new SpeechRecognition();
             recognition.lang = 'fr-FR';
-            recognition.interimResults = false;
 
-            btn.onclick = () => {
+            document.getElementById('micBtn').onclick = () => {
                 recognition.start();
-                btn.classList.add('recording');
-                status.innerText = "Je vous écoute...";
+                document.getElementById('micBtn').classList.add('recording');
+                document.getElementById('status').innerText = "Je vous écoute...";
+                document.getElementById('confirmBox').style.display = 'none';
             };
 
             recognition.onresult = (event) => {
                 const phrase = event.results[0][0].transcript.toUpperCase();
-                btn.classList.remove('recording');
-                status.innerText = "Analyse et envoi...";
+                document.getElementById('micBtn').classList.remove('recording');
+                
+                // Analyse des mots-clés
+                currentData = {
+                    type: types.find(t => phrase.includes(t)) || "DOCUMENT",
+                    client: phrase.match(/CLIENT ([\wÀ-ÿ]+)/)?.[1] || "INCONNU",
+                    ville: phrase.match(/VILLE ([\wÀ-ÿ]+)/)?.[1] || "INCONNUE",
+                    gamme: gammes.find(g => phrase.includes(g)) || "FOUR",
+                    energie: energies.find(e => phrase.includes(e)) || "",
+                    tension: tensions.find(t => phrase.includes(t)) || "",
+                    ferrage: ferrages.find(f => phrase.includes(f)) || "GAUCHE",
+                    niveaux: phrase.match(/(\d+) NIVEAUX/)?.[1] || "",
+                    options: optionsList.filter(o => phrase.includes(o)).join(", ") || "aucune",
+                };
 
-                // Extraction intelligente
-              const data = {
-    type: types.find(t => phrase.includes(t)) || "Non spécifié",
-    client: phrase.match(/CLIENT ([\wÀ-ÿ]+)/)?.[1] || "Inconnu",
-    ville: phrase.match(/À ([\wÀ-ÿ]+)/)?.[1] || phrase.match(/VILLE ([\wÀ-ÿ]+)/)?.[1] || "Inconnue",
-    gamme: gammes.find(g => phrase.includes(g)) || "Non détectée",
-    energie: energies.find(e => phrase.includes(e)) || "Non spécifiée",
-    tension: tensions.find(t => phrase.includes(t)) || "N/C", // <--- NOUVEAU
-    ferrage: ferrages.find(f => phrase.includes(f)) || "Standard", // <--- NOUVEAU
-    niveaux: phrase.match(/(\d+) NIVEAUX/)?.[1] || "N/C",
-    options: optionsList.filter(o => phrase.includes(o)).join(", ") || "Aucune",
-    phrase_complete: phrase
-};
-                // Mise à jour visuelle
-                document.getElementById('out-type').innerText = data.type;
-                document.getElementById('out-client').innerText = data.client;
-                document.getElementById('out-ville').innerText = data.ville;
-                document.getElementById('out-gamme').innerText = data.gamme;
-                document.getElementById('out-energie').innerText = data.energie;
-                document.getElementById('out-niveaux').innerText = data.niveaux;
-                document.getElementById('out-options').innerText = data.options;
+                // Préparation de la phrase de répétition
+                const synthesePhrase = `Vous souhaitez un ${currentData.type} pour le client ${currentData.client} à ${currentData.ville}. Un four ${currentData.gamme} ${currentData.niveaux} niveaux, ${currentData.energie} ${currentData.tension}, ferrage ${currentData.ferrage}, avec les options suivantes : ${currentData.options}. Est-ce correct ?`;
+                
+                // Affichage visuel
+                document.getElementById('previewText').innerHTML = `
+                    <strong>Récapitulatif :</strong><br>
+                    ${currentData.type} - Client: <span class="highlight">${currentData.client}</span> (${currentData.ville})<br>
+                    Modèle: <span class="highlight">${currentData.gamme} ${currentData.niveaux} niv.</span><br>
+                    Config: <span class="highlight">${currentData.energie} / ${currentData.tension} / Porte ${currentData.ferrage}</span><br>
+                    Options: <span class="highlight">${currentData.options}</span>
+                `;
+                document.getElementById('confirmBox').style.display = 'block';
+                document.getElementById('status').innerText = "Vérification en cours...";
 
-               // Envoi à Make
-fetch(webHookUrl, {
-    method: 'POST',
-    // On retire 'no-cors' pour permettre à Make de lire le header
-    body: JSON.stringify(data),
-    headers: { 
-        'Content-Type': 'application/json' 
-    }
-}).then(response => {
-    if (response.ok) {
-        status.innerText = "Transmis avec succès !";
-    } else {
-        status.innerText = "Erreur serveur Make.";
-    }
-}).catch(err => {
-    status.innerText = "Erreur de connexion.";
-    console.error(err);
-});
+                // Lecture vocale
+                const utterThis = new SpeechSynthesisUtterance(synthesePhrase);
+                utterThis.lang = 'fr-FR';
+                synth.speak(utterThis);
             };
-        } else {
-            status.innerText = "Micro non supporté sur ce navigateur.";
+
+            document.getElementById('sendBtn').onclick = () => {
+                fetch(webHookUrl, {
+                    method: 'POST',
+                    body: JSON.stringify(currentData),
+                    headers: { 'Content-Type': 'application/json' }
+                }).then(() => {
+                    alert("Envoyé à Make avec succès !");
+                    document.getElementById('confirmBox').style.display = 'none';
+                    document.getElementById('status').innerText = "Appuyez pour une nouvelle saisie";
+                });
+            };
         }
     </script>
 </body>
