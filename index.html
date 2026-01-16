@@ -5,28 +5,45 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>UNOX Voice Assistant</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; text-align: center; padding: 20px; background: #1a1a1a; color: white; }
-        .card { background: #2d2d2d; padding: 20px; border-radius: 15px; max-width: 500px; margin: auto; }
-        #micBtn { width: 100px; height: 100px; border-radius: 50%; border: none; background: #007bff; color: white; font-size: 40px; cursor: pointer; }
-        .recording { background: #dc3545 !important; animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(220, 53, 69, 0); } 100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); } }
-        #confirmBox { display: none; margin-top: 20px; border-top: 1px solid #444; padding-top: 20px; }
-        .btn-send { background: #28a745; color: white; padding: 15px 30px; border: none; border-radius: 8px; font-size: 18px; cursor: pointer; }
-        .preview { text-align: left; background: #3d3d3d; padding: 15px; border-radius: 8px; margin: 15px 0; font-size: 14px; }
-        .highlight { color: #00d1b2; font-weight: bold; }
+        body { font-family: 'Segoe UI', sans-serif; text-align: center; padding: 20px; background: #121212; color: white; }
+        .card { background: #1e1e1e; padding: 20px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); max-width: 450px; margin: auto; border: 1px solid #333; }
+        #micBtn { width: 90px; height: 90px; border-radius: 50%; border: none; background: #007bff; color: white; font-size: 35px; cursor: pointer; transition: 0.3s; margin: 20px 0; }
+        .recording { background: #ff4757 !important; transform: scale(1.1); box-shadow: 0 0 20px #ff4757; }
+        
+        /* Aide et Explications */
+        #helpBtn { background: none; border: 1px solid #555; color: #aaa; padding: 5px 15px; border-radius: 20px; cursor: pointer; font-size: 13px; margin-bottom: 10px; }
+        #helpContent { display: none; background: #252525; padding: 15px; border-radius: 10px; text-align: left; font-size: 13px; margin-top: 10px; color: #ddd; line-height: 1.5; }
+        
+        #confirmBox { display: none; margin-top: 20px; background: #2d2d2d; padding: 15px; border-radius: 12px; border: 1px dashed #555; }
+        .btn-send { background: #2ed573; color: white; padding: 12px 25px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 10px; }
+        .preview { text-align: left; font-size: 14px; margin-bottom: 10px; }
+        .highlight { color: #1e90ff; font-weight: bold; }
+        .status { font-style: italic; color: #888; font-size: 14px; }
     </style>
 </head>
 <body>
 
     <div class="card">
+        <button id="helpBtn">❓ Comment utiliser ?</button>
+        <div id="helpContent">
+            <strong>Exemple à dire :</strong><br>
+            "Fais-moi un <b>Devis</b> pour <b>Client</b> Martin à <b>Ville</b> Lyon, four <b>Cheftop</b> <b>gaz</b> <b>10 niveaux</b> en <b>Tri</b> avec <b>ferrage à droite</b> et option <b>lavage</b>."
+            <br><br>
+            <strong>Mots-clés reconnus :</strong><br>
+            • Type : Devis, Commande, Facture<br>
+            • Gamme : Cheftop, Bakertop, Speed, etc.<br>
+            • Énergie : Gaz, Électrique<br>
+            • Tension : Mono, Tri<br>
+            • Ferrage : Gauche, Droite
+        </div>
+
         <h2>Assistant UNOX</h2>
         <button id="micBtn">🎙️</button>
-        <div id="status" style="margin: 15px 0; font-style: italic; color: #aaa;">Appuyez pour dicter</div>
+        <div id="status" class="status">Appuyez pour dicter votre demande</div>
 
         <div id="confirmBox">
             <div class="preview" id="previewText"></div>
-            <button class="btn-send" id="sendBtn">✅ CONFIRMER ET ENVOYER</button>
-            <p style="font-size: 12px; color: #888; margin-top: 10px;">Ou ré-appuyez sur le micro pour recommencer</p>
+            <button class="btn-send" id="sendBtn">ENVOYER À MAKE ✅</button>
         </div>
     </div>
 
@@ -34,6 +51,7 @@
         const webHookUrl = "VOTRE_URL_MAKE_ICI"; 
         let currentData = null;
 
+        // --- LISTES DE RÉFÉRENCE ---
         const types = ["DEVIS", "COMMANDE", "FACTURE"];
         const gammes = ["CHEFTOP", "BAKERTOP", "SPEED", "BAKERLUX", "CHEFLUX", "LINEMISS", "LINEMICRO", "EVEREO"];
         const energies = ["GAZ", "ELECTRIQUE", "ÉLECTRIQUE"];
@@ -43,6 +61,12 @@
 
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         const synth = window.speechSynthesis;
+
+        // Toggle Aide
+        document.getElementById('helpBtn').onclick = () => {
+            const content = document.getElementById('helpContent');
+            content.style.display = content.style.display === 'block' ? 'none' : 'block';
+        };
 
         if (SpeechRecognition) {
             const recognition = new SpeechRecognition();
@@ -59,34 +83,33 @@
                 const phrase = event.results[0][0].transcript.toUpperCase();
                 document.getElementById('micBtn').classList.remove('recording');
                 
-                // Analyse des mots-clés
+                // Analyse intelligente
                 currentData = {
                     type: types.find(t => phrase.includes(t)) || "DOCUMENT",
                     client: phrase.match(/CLIENT ([\wÀ-ÿ]+)/)?.[1] || "INCONNU",
-                    ville: phrase.match(/VILLE ([\wÀ-ÿ]+)/)?.[1] || "INCONNUE",
+                    ville: phrase.match(/VILLE ([\wÀ-ÿ]+)/)?.[1] || phrase.match(/À ([\wÀ-ÿ]+)/)?.[1] || "INCONNUE",
                     gamme: gammes.find(g => phrase.includes(g)) || "FOUR",
-                    energie: energies.find(e => phrase.includes(e)) || "",
-                    tension: tensions.find(t => phrase.includes(t)) || "",
+                    energie: energies.find(e => phrase.includes(e)) || "ÉLECTRIQUE",
+                    tension: tensions.find(t => phrase.includes(t)) || "N/C",
                     ferrage: ferrages.find(f => phrase.includes(f)) || "GAUCHE",
-                    niveaux: phrase.match(/(\d+) NIVEAUX/)?.[1] || "",
+                    niveaux: phrase.match(/(\d+) NIVEAUX/)?.[1] || "N/C",
                     options: optionsList.filter(o => phrase.includes(o)).join(", ") || "aucune",
                 };
 
-                // Préparation de la phrase de répétition
-                const synthesePhrase = `Vous souhaitez un ${currentData.type} pour le client ${currentData.client} à ${currentData.ville}. Un four ${currentData.gamme} ${currentData.niveaux} niveaux, ${currentData.energie} ${currentData.tension}, ferrage ${currentData.ferrage}, avec les options suivantes : ${currentData.options}. Est-ce correct ?`;
+                // Synthèse Vocale de validation
+                const synthesePhrase = `Vous souhaitez un ${currentData.type} pour le client ${currentData.client} à ${currentData.ville}. Un four ${currentData.gamme} ${currentData.niveaux} niveaux, ${currentData.energie} ${currentData.tension}, ferrage ${currentData.ferrage}. Est-ce correct ?`;
                 
-                // Affichage visuel
                 document.getElementById('previewText').innerHTML = `
-                    <strong>Récapitulatif :</strong><br>
-                    ${currentData.type} - Client: <span class="highlight">${currentData.client}</span> (${currentData.ville})<br>
-                    Modèle: <span class="highlight">${currentData.gamme} ${currentData.niveaux} niv.</span><br>
-                    Config: <span class="highlight">${currentData.energie} / ${currentData.tension} / Porte ${currentData.ferrage}</span><br>
-                    Options: <span class="highlight">${currentData.options}</span>
+                    <strong>Vérification :</strong><br>
+                    📄 Type : <span class="highlight">${currentData.type}</span><br>
+                    👤 Client : <span class="highlight">${currentData.client}</span> (${currentData.ville})<br>
+                    🔥 Modèle : <span class="highlight">${currentData.gamme} - ${currentData.niveaux} niv.</span><br>
+                    ⚡ Config : <span class="highlight">${currentData.energie} / ${currentData.tension} / Porte ${currentData.ferrage}</span><br>
+                    🛠️ Options : <span class="highlight">${currentData.options}</span>
                 `;
                 document.getElementById('confirmBox').style.display = 'block';
-                document.getElementById('status').innerText = "Vérification en cours...";
+                document.getElementById('status').innerText = "Validation vocale...";
 
-                // Lecture vocale
                 const utterThis = new SpeechSynthesisUtterance(synthesePhrase);
                 utterThis.lang = 'fr-FR';
                 synth.speak(utterThis);
@@ -98,10 +121,10 @@
                     body: JSON.stringify(currentData),
                     headers: { 'Content-Type': 'application/json' }
                 }).then(() => {
-                    alert("Envoyé à Make avec succès !");
+                    alert("JSON envoyé avec succès !");
                     document.getElementById('confirmBox').style.display = 'none';
-                    document.getElementById('status').innerText = "Appuyez pour une nouvelle saisie";
-                });
+                    document.getElementById('status').innerText = "Transmis.";
+                }).catch(err => alert("Erreur d'envoi. Vérifiez l'URL du Webhook."));
             };
         }
     </script>
